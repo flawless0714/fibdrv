@@ -27,6 +27,14 @@ unload:
 client: client.c
 	$(CC) -o $@ $^
 
+test: client
+	sudo ./$^
+	$(MAKE) plot
+
+plot: 
+	gnuplot scripts/perf.gp
+	gpicview perf_measure.png
+
 PRINTF = env printf
 PASS_COLOR = \e[32;01m
 NO_COLOR = \e[0m
