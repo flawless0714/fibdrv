@@ -9,7 +9,7 @@
 #define FIB_DEV "/dev/fibonacci"
 #define PERF_RESULT_DOWNWARD_PATH "orig_downward_perf_res.txt"
 #define PERF_RESULT_UPWARD_PATH "orig_upward_perf_res.txt"
-#define TEST_COUNT 500
+#define TEST_COUNT 100
 #define FABONACII_INPUT 100
 
 #define unlikely(x) __builtin_expect(!!(x), 0)
