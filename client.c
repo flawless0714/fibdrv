@@ -109,6 +109,8 @@ int main()
         fprintf(fp_perf, "%d %ld\n", j, avg_res_userspace[j]);
     }
 
+    fclose(fp_perf);
+
     fp_perf = fopen(PERF_RESULT_UPWARD_PATH, "w");
     if (!fp_perf) {
         perror("Failed to create result file");
@@ -158,7 +160,7 @@ int main()
                 avg_res_kernelspace[j], avg_trans_time[j]);
     }
 
-    fclose(fp_perf); /* FIX: forgot to close previous fd */
+    fclose(fp_perf);
     close(fd);
     return 0;
 
