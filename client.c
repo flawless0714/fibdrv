@@ -17,12 +17,6 @@
 typedef long diff_ns;
 typedef int64_t ktime_t;  // TODO: find the way to include ktime.h
 
-
-struct read_sys_rt {
-    long long fabo_res;
-    ktime_t K_delta;  // real calculation time in kernel, K stands for kernel
-};
-
 static inline diff_ns time_diff_ns(struct timespec *start, struct timespec *end)
 {
     long delta = end->tv_nsec - start->tv_nsec;
@@ -40,7 +34,6 @@ int main()
     long avg_res_userspace[FABONACII_INPUT] = {0},
          avg_res_kernelspace[FABONACII_INPUT] = {0}, tmp_nsec;
     ktime_t avg_trans_time[FABONACII_INPUT] = {0};
-    struct read_sys_rt res_from_kernel;
     size_t rd_size = sizeof(ktime_t);
 
     int fd;
