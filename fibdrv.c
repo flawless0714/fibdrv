@@ -4,8 +4,10 @@
 #include <linux/init.h>
 #include <linux/kdev_t.h>
 #include <linux/kernel.h>
+#include <linux/ktime.h>
 #include <linux/module.h>
 #include <linux/mutex.h>
+#include <linux/uaccess.h>
 
 MODULE_LICENSE("Dual MIT/GPL");
 MODULE_AUTHOR("National Cheng Kung University, Taiwan");
@@ -24,9 +26,11 @@ static struct cdev *fib_cdev;
 static struct class *fib_class;
 static DEFINE_MUTEX(fib_mutex);
 
-static long long fib_sequence(long long k)
+static long long fib_sequence(long long k, char *buf, size_t size)
 {
     /* FIXME: use clz/ctz and fast algorithms to speed up */
+    ktime_t start = ktime_get_ns(), end, tmp_diff;
+
     long long f[k + 2];
 
     f[0] = 0;
@@ -35,6 +39,11 @@ static long long fib_sequence(long long k)
     for (int i = 2; i <= k; i++) {
         f[i] = f[i - 1] + f[i - 2];
     }
+
+    end = ktime_get_ns();
+
+    tmp_diff = end - start;
+    copy_to_user(buf, &tmp_diff, size);
 
     return f[k];
 }
@@ -54,13 +63,13 @@ static int fib_release(struct inode *inode, struct file *file)
     return 0;
 }
 
-/* calculate the fibonacci number at given offset */
+/* calculate the fibonacci number execution time  */
 static ssize_t fib_read(struct file *file,
                         char *buf,
                         size_t size,
                         loff_t *offset)
 {
-    return (ssize_t) fib_sequence(*offset);
+    return (ssize_t) fib_sequence(*offset, buf, size);
 }
 
 /* write operation is skipped */
