@@ -29,3 +29,9 @@ dkms.conf
 # test-oriented
 client
 out
+
+# Local misc
+.vscode/settings.json
+orig_upward_perf_res.txt
+orig_downward_perf_res.txt
+*.png
