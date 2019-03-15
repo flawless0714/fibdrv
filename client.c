@@ -30,11 +30,7 @@ static inline diff_ns time_diff_ns(struct timespec *start, struct timespec *end)
         return -1;  // calculation of fabonacci spends too much time (at least 2
                     // second), won't happen at usual
 
-    return (
-        delta >= 0
-            ? delta
-            : (delta +
-               10e9)); /* FIX: remove redundant expr, return delta directly */
+    return delta;
 }
 
 int main()
