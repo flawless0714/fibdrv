@@ -8,6 +8,9 @@
 #include <linux/module.h>
 #include <linux/mutex.h>
 #include <linux/uaccess.h>
+#include "common.h"
+#include "tiny-bignum-c/bn_kernel_space.h"
+
 
 MODULE_LICENSE("Dual MIT/GPL");
 MODULE_AUTHOR("National Cheng Kung University, Taiwan");
@@ -16,15 +19,116 @@ MODULE_VERSION("0.1");
 
 #define DEV_FIBONACCI_NAME "fibonacci"
 
+#ifdef BIG_NUM
+#define MAX_LENGTH 150
+#elif defined ORIG_NUM
 /* MAX_LENGTH is set to 92 because
  * ssize_t can't fit the number > 92
  */
 #define MAX_LENGTH 92
+#endif
 
 static dev_t fib_dev = 0;
 static struct cdev *fib_cdev;
 static struct class *fib_class;
 static DEFINE_MUTEX(fib_mutex);
+
+
+#ifdef BIG_NUM
+/* force add external function to kernel module */
+void bignum_assign(struct bn *dst, struct bn *src)
+{
+    // require(dst, "dst is null");
+    // require(src, "src is null");
+
+    int i;
+    for (i = 0; i < BN_ARRAY_SIZE; ++i) {
+        dst->array[i] = src->array[i];
+    }
+}
+
+void bignum_add(struct bn *a, struct bn *b, struct bn *c)
+{
+    // require(a, "a is null");
+    // require(b, "b is null");
+    // require(c, "c is null");
+
+    DTYPE_TMP tmp;
+    int carry = 0;
+    int i;
+    for (i = 0; i < BN_ARRAY_SIZE; ++i) {
+        tmp = (DTYPE_TMP) a->array[i] + b->array[i] + carry;
+        carry = (tmp > MAX_VAL);
+        c->array[i] = (tmp & MAX_VAL);
+    }
+}
+
+void bignum_from_int(struct bn *n, DTYPE_TMP i)
+{
+    // require(n, "n is null");
+
+    bignum_init(n);
+
+    /* Endianness issue if machine is not little-endian? */
+#ifdef WORD_SIZE
+#if (WORD_SIZE == 1)
+    n->array[0] = (i & 0x000000ff);
+    n->array[1] = (i & 0x0000ff00) >> 8;
+    n->array[2] = (i & 0x00ff0000) >> 16;
+    n->array[3] = (i & 0xff000000) >> 24;
+#elif (WORD_SIZE == 2)
+    n->array[0] = (i & 0x0000ffff);
+    n->array[1] = (i & 0xffff0000) >> 16;
+#elif (WORD_SIZE == 4)
+    n->array[0] = i;
+    DTYPE_TMP num_32 = 32;
+    DTYPE_TMP tmp =
+        i >> num_32; /* bit-shift with U64 operands to force 64-bit results */
+    n->array[1] = tmp;
+#endif
+#endif
+}
+
+void bignum_init(struct bn *n)
+{
+    // require(n, "n is null");
+
+    int i;
+    for (i = 0; i < BN_ARRAY_SIZE; ++i) {
+        n->array[i] = 0;
+    }
+}
+/* -------------------------------------------- */
+struct fabo_res {
+    struct bn result;
+    ktime_t ker_time_ns;
+};
+
+static void fib_sequence(long long k, char *buf, size_t size)
+{
+    /* FIXME: use clz/ctz and fast algorithms to speed up */
+    ktime_t start, end;
+    struct fabo_res res;
+    struct bn tmp, f[k + 2];
+
+    bignum_from_int(&f[0], 0);
+    bignum_from_int(&f[1], 1);
+
+    start = ktime_get_ns();
+    for (int i = 2; i <= k; i++) {
+        bignum_add(&f[i - 1], &f[i - 2], &tmp);
+        bignum_assign(&f[i], &tmp);
+    }
+    end = ktime_get_ns();
+
+    res.ker_time_ns = end - start;
+
+    bignum_assign(&res.result, &f[k]);
+
+    copy_to_user(buf, &res, size);
+}
+
+#elif defined ORIG_NUM
 
 static long long fib_sequence(long long k, char *buf, size_t size)
 {
@@ -48,6 +152,8 @@ static long long fib_sequence(long long k, char *buf, size_t size)
     return f[k];
 }
 
+#endif
+
 static int fib_open(struct inode *inode, struct file *file)
 {
     if (!mutex_trylock(&fib_mutex)) {
@@ -69,7 +175,16 @@ static ssize_t fib_read(struct file *file,
                         size_t size,
                         loff_t *offset)
 {
+#ifdef BIG_NUM
+
+    fib_sequence(*offset, buf, size);
+    return 0;
+
+#elif defined ORIG_NUM
+
     return (ssize_t) fib_sequence(*offset, buf, size);
+
+#endif
 }
 
 /* write operation is skipped */
