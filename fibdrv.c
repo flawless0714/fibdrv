@@ -36,7 +36,7 @@ static DEFINE_MUTEX(fib_mutex);
 
 #ifdef BIG_NUM
 /* force add external function to kernel module */
-void bignum_assign(struct bn *dst, struct bn *src)
+inline void bignum_assign(struct bn *dst, struct bn *src)
 {
     // require(dst, "dst is null");
     // require(src, "src is null");
@@ -47,7 +47,7 @@ void bignum_assign(struct bn *dst, struct bn *src)
     }
 }
 
-void bignum_add(struct bn *a, struct bn *b, struct bn *c)
+inline void bignum_add(struct bn *a, struct bn *b, struct bn *c)
 {
     // require(a, "a is null");
     // require(b, "b is null");
@@ -63,7 +63,7 @@ void bignum_add(struct bn *a, struct bn *b, struct bn *c)
     }
 }
 
-void bignum_from_int(struct bn *n, DTYPE_TMP i)
+inline void bignum_from_int(struct bn *n, DTYPE_TMP i)
 {
     // require(n, "n is null");
 
@@ -89,7 +89,7 @@ void bignum_from_int(struct bn *n, DTYPE_TMP i)
 #endif
 }
 
-void bignum_init(struct bn *n)
+inline void bignum_init(struct bn *n)
 {
     // require(n, "n is null");
 
@@ -108,8 +108,15 @@ static void fib_sequence(long long k, char *buf, size_t size)
 {
     /* FIXME: use clz/ctz and fast algorithms to speed up */
     ktime_t start, end;
+
     struct fabo_res res;
+    memset(&res, 0,
+           sizeof(struct fabo_res));  // TODO! even init the var, the result is
+                                      // still faulty when k ~= 80
+
     struct bn tmp, f[k + 2];
+    memset(&tmp, 0, sizeof(struct bn));
+    memset(f, 0, sizeof(struct bn) * (k + 2));
 
     bignum_from_int(&f[0], 0);
     bignum_from_int(&f[1], 1);

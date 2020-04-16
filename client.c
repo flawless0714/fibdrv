@@ -9,9 +9,9 @@
 #include "tiny-bignum-c/bn.h"
 
 #define FIB_DEV "/dev/fibonacci"
-#define TEST_COUNT 100
+#define TEST_COUNT 20
 #define FABONACII_INPUT                                                     \
-    110 /* note that the result of input over 92 of orig version is faulty, \
+    100 /* note that the result of input over 92 of orig version is faulty, \
            but it still ran the calculation */
 
 #define unlikely(x) __builtin_expect(!!(x), 0)
