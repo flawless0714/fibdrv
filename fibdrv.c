@@ -24,6 +24,44 @@ static struct cdev *fib_cdev;
 static struct class *fib_class;
 static DEFINE_MUTEX(fib_mutex);
 
+/* Modified from https://github.com/chunminchang 's work */
+uint64_t fib_fast_doubling(int64_t n)
+{
+    // The position of the highest bit of n.
+    // So we need to loop `h` times to get the answer.
+    // Example: n = (Dec)50 = (Bin)00110010, then h = 6.
+    //                               ^ 6th bit from right side
+    unsigned int h = 0;
+    for (int64_t i = n; i; ++h, i >>= 1)
+        ;
+
+    uint64_t a = 0;  // F(0) = 0
+    uint64_t b = 1;  // F(1) = 1
+    // There is only one `1` in the bits of `mask`. The `1`'s position is same
+    // as the highest bit of n(mask = 2^(h-1) at first), and it will be shifted
+    // right iteratively to do `AND` operation with `n` to check `n_j` is odd or
+    // even, where n_j is defined below.
+    for (uint64_t mask = 1 << (h - 1); mask; mask >>= 1) {  // Run h times!
+        // Let j = h-i (looping from i = 1 to i = h), n_j = floor(n / 2^j) = n
+        // >> j (n_j = n when j = 0), k = floor(n_j / 2), then a = F(k), b =
+        // F(k+1) now.
+        uint64_t c = a * (2 * b - a);  // F(2k) = F(k) * [ 2 * F(k+1) – F(k) ]
+        uint64_t d = a * a + b * b;    // F(2k+1) = F(k)^2 + F(k+1)^2
+
+        if (mask & n) {  // n_j is odd: k = (n_j-1)/2 => n_j = 2k + 1
+            a = d;       //   F(n_j) = F(2k + 1)
+            b = c + d;   //   F(n_j + 1) = F(2k + 2) = F(2k) + F(2k + 1)
+        } else {         // n_j is even: k = n_j/2 => n_j = 2k
+            a = c;       //   F(n_j) = F(2k)
+            b = d;       //   F(n_j + 1) = F(2k + 1)
+        }
+    }
+
+    return a;
+}
+
+
+#if 0
 static long long fib_sequence(long long k)
 {
     /* FIXME: use clz/ctz and fast algorithms to speed up */
@@ -38,6 +76,7 @@ static long long fib_sequence(long long k)
 
     return f[k];
 }
+#endif
 
 static int fib_open(struct inode *inode, struct file *file)
 {
@@ -60,7 +99,7 @@ static ssize_t fib_read(struct file *file,
                         size_t size,
                         loff_t *offset)
 {
-    return (ssize_t) fib_sequence(*offset);
+    return (ssize_t) fib_fast_doubling(*offset);
 }
 
 /* write operation is skipped */
