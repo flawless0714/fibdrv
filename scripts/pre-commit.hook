@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
 
-CPPCHECK_suppresses="--suppress=missingIncludeSystem"
-CPPCHECK_OPTS="-I. --enable=all --error-exitcode=1 --force $CPPCHECK_suppresses ."
+CPPCHECK_suppresses="--suppress=missingIncludeSystem \
+                     --suppress=*:bignum/bignum.c:302 \
+                     --suppress=*:bignum/apm.c:159"
+CPPCHECK_OPTS="-I. -Ibignum/--enable=all --error-exitcode=1 --force $CPPCHECK_suppresses ."
 
 RETURN=0
 CLANG_FORMAT=$(which clang-format)
