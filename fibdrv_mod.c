@@ -6,6 +6,7 @@
 #include <linux/kernel.h>
 #include <linux/module.h>
 #include <linux/mutex.h>
+#include "bignum/bn.h"
 
 MODULE_LICENSE("Dual MIT/GPL");
 MODULE_AUTHOR("National Cheng Kung University, Taiwan");
@@ -17,23 +18,68 @@ MODULE_VERSION("0.1");
 /* MAX_LENGTH is set to 92 because
  * ssize_t can't fit the number > 92
  */
-#define MAX_LENGTH 92
+#define MAX_LENGTH 1000
 
 static dev_t fib_dev = 0;
 static struct cdev *fib_cdev;
 static struct class *fib_class;
 static DEFINE_MUTEX(fib_mutex);
 
+/* Modified using: https://github.com/sysprog/bignum */
+static void bignum_fibonacci(uint64_t n, bn *fib)
+{
+    if (unlikely(n <= 2)) {
+        if (n == 0)
+            bn_zero(fib);
+        else
+            bn_set_u32(fib, 1);
+        return;
+    }
+
+    bn *a1 = fib; /* Use output param fib as a1 */
+
+    bn_t a0, tmp, a;
+    bn_init_u32(a0, 0); /*  a0 = 0 */
+    bn_set_u32(a1, 1);  /*  a1 = 1 */
+    bn_init(tmp);       /* tmp = 0 */
+    bn_init(a);
+
+    /* Start at second-highest bit set. */
+    for (uint64_t k = ((uint64_t) 1) << (62 - __builtin_clzll(n)); k; k >>= 1) {
+        /* Both ways use two squares, two adds, one multipy and one shift. */
+        bn_lshift(a0, 1, a); /* a03 = a0 * 2 */
+        bn_add(a, a1, a);    /*   ... + a1 */
+        bn_sqr(a1, tmp);     /* tmp = a1^2 */
+        bn_sqr(a0, a0);      /* a0 = a0 * a0 */
+        bn_add(a0, tmp, a0); /*  ... + a1 * a1 */
+        bn_mul(a1, a, a1);   /*  a1 = a1 * a */
+        if (k & n) {
+            bn_swap(a1, a0);    /*  a1 <-> a0 */
+            bn_add(a0, a1, a1); /*  a1 += a0 */
+        }
+    }
+    /* Now a1 (alias of output parameter fib) = F[n] */
+
+    bn_free(a0);
+    bn_free(tmp);
+    bn_free(a);
+}
+
+#if 0
 /* Modified from https://github.com/chunminchang 's work */
-uint64_t fib_fast_doubling(int64_t n)
+static uint64_t fib_fast_doubling(int64_t n)
 {
     // The position of the highest bit of n.
     // So we need to loop `h` times to get the answer.
     // Example: n = (Dec)50 = (Bin)00110010, then h = 6.
     //                               ^ 6th bit from right side
-    unsigned int h = 0;
-    for (int64_t i = n; i; ++h, i >>= 1)
-        ;
+    unsigned int h;
+
+    /* It's UB if %n is zero, so we must branching here */
+    if (likely(n))
+        h = __builtin_clzl(n);
+    else
+        h = 0;
 
     uint64_t a = 0;  // F(0) = 0
     uint64_t b = 1;  // F(1) = 1
@@ -59,7 +105,7 @@ uint64_t fib_fast_doubling(int64_t n)
 
     return a;
 }
-
+#endif
 
 #if 0
 static long long fib_sequence(long long k)
@@ -99,7 +145,13 @@ static ssize_t fib_read(struct file *file,
                         size_t size,
                         loff_t *offset)
 {
-    return (ssize_t) fib_fast_doubling(*offset);
+    bn_t fib = BN_INITIALIZER;
+
+    bignum_fibonacci(*offset, fib);
+    bn_dump(fib, 10, buf);
+    bn_free(fib);
+
+    return 0;
 }
 
 /* write operation is skipped */
